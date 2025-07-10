@@ -10,6 +10,7 @@ mask_output_path = "train_masks"
 
 num_images = os.listdir(images_path)
 
+
 def tiff_to_grayscale(image):
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
@@ -59,8 +60,8 @@ def shuffle_image_blocks(img, mask, num_blocks=8, seed=None):
         reconstructed_mask[i_new*block_height:(i_new+1)*block_height,
                            j_new*block_width:(j_new+1)*block_width] = mask_block
 
-    return reconstructed_img, reconstructed_mask
-
+    return reconstructed_img, reconstructed_mask, img_blocks, mask_blocks
+counter = 0
 for i in range(1,len(num_images)+1):
     image_file = f"{images_path}/{i}.tif"
     mask_file = f"{masks_path}/{i}.png"
@@ -69,10 +70,14 @@ for i in range(1,len(num_images)+1):
     mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
     gray = tiff_to_grayscale(image)
 
-    shuffled_image, shuffled_mask = shuffle_image_blocks(gray, mask, num_blocks=8, seed=42)
-    cv2.imwrite(f"{image_output_path}/{i}.png", shuffled_image)
-    cv2.imwrite(f"{mask_output_path}/{i}.png", shuffled_mask)
-    
-    
-
-    
+    shuffled_image, shuffled_mask, img_blocks, mask_blocks = shuffle_image_blocks(gray, mask, num_blocks=8, seed=42)
+    for (img_block, mask_block) in zip(img_blocks, mask_blocks):
+        # if avg color of the mask block is less than 0.5, skip saving
+        if np.mean(mask_block) < 0.1:
+            continue
+        # apply clahe to the image block
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        img_block = clahe.apply(img_block)
+        cv2.imwrite(f"{image_output_path}/{counter}.png", img_block)
+        cv2.imwrite(f"{mask_output_path}/{counter}.png", mask_block)
+        counter += 1
